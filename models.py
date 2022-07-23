@@ -73,7 +73,7 @@ def bert_embed1d(text, tokenizer, model, max_len=512, trained=False):
     last_hidden_states = last_hidden_states[0]
     if device.type == 'cuda':
         last_hidden_states = last_hidden_states.cpu()
-    features = last_hidden_states[:, 0, :].numpy()  # use the <cls> token
+    features = last_hidden_states[:, 0, :].numpy()
     return features, attention_mask
 
 
@@ -118,15 +118,15 @@ class Baseline():
         self.pipe.fit(X, y)
 
     def test(self, X, y):
-        scores = {'acc': [], 'prec': [], 'rec': [], 'f1': [], 'fprs': [], 'tprs': [], 'auc': []}
+        scores = {'acc': [], 'prec': [], 'rec': [], 'f1': []}
         preds = self.pipe.predict(X)
         logits = self.pipe.predict_proba(X)
         scores['acc'] = accuracy_score(y, preds)
         scores['prec'] = precision_score(y, preds)
         scores['rec'] = recall_score(y, preds)
         scores['f1'] = f1_score(y, preds)
-        scores['fprs'], scores['tprs'], _ = roc_curve(y, logits[:, 1])
-        scores['auc'] = auc(scores['fprs'], scores['tprs'])
+        # scores['fprs'], scores['tprs'], _ = roc_curve(y, logits[:, 1])
+        # scores['auc'] = auc(scores['fprs'], scores['tprs'])
         return scores
 
     def cross_validate(self, X, y, cv=5, times=None):
@@ -163,7 +163,7 @@ class Baseline():
 
     def cv_test(self, features, labels, tst_features, test_ad, cv=5, times=5, testtimes=1):
         scores = self.cross_validate(features, labels, cv=cv, times=times)
-        print(". \tacc\t      prec\t    rec\t\t  f1\t\tauc")
+        print(". \tacc\t      prec\t    rec\t\t  f1")
         print("cv{}:".format(cv), self.scores_str(scores))
         # print("All accs:"+(("\n"+" {:.2f}"*cv)*times).format(*scores['acc']))
         tst_scores = self.fit_test(features, labels, tst_features, test_ad, times=testtimes)
@@ -171,10 +171,9 @@ class Baseline():
         return scores, tst_scores
 
     def scores_str(self, scores):
-        return "{:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f})".format(
+        return "{:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f})".format(
             scores['acc'].mean(), scores['acc'].std(), scores['prec'].mean(), scores['prec'].std(),
-            scores['rec'].mean(), scores['rec'].std(), scores['f1'].mean(), scores['f1'].std(),
-            scores['auc'].mean(), scores['auc'].std())
+            scores['rec'].mean(), scores['rec'].std(), scores['f1'].mean(), scores['f1'].std())
 
     def print_scores(self, scores, mode='test'):
         if mode=='test':
@@ -339,21 +338,21 @@ class Classifier():
         return self.bestmodel
 
     def test(self, X, y):
-        scores = {'acc': [], 'prec': [], 'rec': [], 'f1': [], 'fprs': [], 'tprs': [], 'auc': []}
+        scores = {'acc': [], 'prec': [], 'rec': [], 'f1': []}
         self.model.load_state_dict(self.bestmodel)
         if self.expand_dim:
             X = np.expand_dims(X, self.expand_dim)
         with torch.no_grad():
             X = [torch.FloatTensor(X[m].astype(np.float64)) for m in range(len(X))] if isinstance(X, list) else torch.FloatTensor(X.astype(np.float64))
             preds = self.model.forward(X)
-            logits = F.softmax(preds).cpu().data.numpy()
+            logits = F.softmax(preds, dim=1).cpu().data.numpy()
             preds = np.argmax(logits, axis=-1)
         scores['acc'] = accuracy_score(y, preds)
         scores['prec'] = precision_score(y, preds)
         scores['rec'] = recall_score(y, preds)
         scores['f1'] = f1_score(y, preds)
-        scores['fprs'], scores['tprs'], _ = roc_curve(y, logits[:, 1])
-        scores['auc'] = auc(scores['fprs'], scores['tprs'])  # roc_auc_score(y, logits[:, 1])
+        # scores['fprs'], scores['tprs'], _ = roc_curve(y, logits[:, 1])
+        # scores['auc'] = auc(scores['fprs'], scores['tprs'])  # roc_auc_score(y, logits[:, 1])
         return scores
 
     def fit_test(self, X_trn, y_trn, X_tst, y_tst, times=25, toarray=True):
@@ -411,7 +410,7 @@ class Classifier():
 
     def cv_test(self, features, labels, tst_features, test_ad, cv=5, times=5, testtimes=1):
         scores = self.cross_validate(features, labels, cv=cv, times=times)
-        print(". \tacc\t      prec\t    rec\t\t  f1\t\tauc")
+        print(". \tacc\t      prec\t    rec\t\t  f1")
         print("cv{}:".format(cv), self.scores_str(scores))
         # print("All accs:"+(("\n"+" {:.2f}"*cv)*times).format(*scores['acc']))
         tst_scores = self.fit_test(features, labels, tst_features, test_ad, times=testtimes)
@@ -419,10 +418,9 @@ class Classifier():
         return scores, tst_scores
 
     def scores_str(self, scores):
-        return "{:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f})".format(
+        return "{:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f}) & {:.2f} ({:.2f})".format(
             scores['acc'].mean(), scores['acc'].std(), scores['prec'].mean(), scores['prec'].std(),
-            scores['rec'].mean(), scores['rec'].std(), scores['f1'].mean(), scores['f1'].std(),
-            scores['auc'].mean(), scores['auc'].std())
+            scores['rec'].mean(), scores['rec'].std(), scores['f1'].mean(), scores['f1'].std())
 
     def print_scores(self, scores, mode='test'):
         if mode=='test':
